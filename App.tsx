@@ -112,6 +112,21 @@ const App: React.FC = () => {
   const handleCloseModal = () => {
     setSelectedImage(null);
   }
+  
+  const handleUpscaleImage = (itemId: string, newSrc: string) => {
+    // Update the gallery with the new upscaled image source
+    setGallery(prevGallery => 
+      prevGallery.map(item => 
+        item.id === itemId ? { ...item, src: newSrc } : item
+      )
+    );
+    // Update the selected image in the modal as well
+    setSelectedImage(prevSelected => 
+        prevSelected && prevSelected.id === itemId 
+        ? { ...prevSelected, src: newSrc } 
+        : prevSelected
+    );
+  };
 
   return (
     <div className="flex flex-col h-screen bg-gray-900 text-gray-200 overflow-hidden">
@@ -137,7 +152,7 @@ const App: React.FC = () => {
         </section>
       </main>
       {/* Fix: Corrected typo from handleCloseOmit to handleCloseModal */}
-      {selectedImage && <ImageDetailModal item={selectedImage} onClose={handleCloseModal} />}
+      {selectedImage && <ImageDetailModal item={selectedImage} onClose={handleCloseModal} onUpscale={handleUpscaleImage} />}
     </div>
   );
 };

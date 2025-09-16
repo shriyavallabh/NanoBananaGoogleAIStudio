@@ -47,16 +47,20 @@ export const generateImage = async (
     try {
         // --- Multimodal Generation (Text + Image Input) ---
         if (referenceImages.length > 0) {
+            // The image editing model expects a single reference image.
+            if (referenceImages.length > 1) {
+                console.warn(`The image editing model supports only one reference image. Using the first of ${referenceImages.length} provided images.`);
+            }
+            
             const parts = [
-                ...referenceImages.map(fileToGenerativePart),
+                fileToGenerativePart(referenceImages[0]), // Use only the first image
                 { text: prompt },
             ];
 
             const response = await ai.models.generateContent({
                 model: 'gemini-2.5-flash-image-preview',
-                contents: { parts },
+                contents: { parts }, // Corrected: must be an object for single-turn requests
                 config: {
-                    // Aspect ratio is not supported in this model, it's inferred.
                     responseModalities: [Modality.IMAGE, Modality.TEXT],
                 },
             });
@@ -99,6 +103,55 @@ export const generateImage = async (
         console.error('Error calling Gemini API:', error);
         let errorMessage = 'An unknown error occurred during image generation.';
         if (error instanceof Error) {
+            errorMessage = error.message;
+            const geminiError = error as any;
+            if (geminiError.response?.promptFeedback?.blockReason) {
+                errorMessage = `Request blocked: ${geminiError.response.promptFeedback.blockReason}.`;
+            }
+        }
+        throw new Error(errorMessage);
+    }
+};
+
+/**
+ * Upscales an image to 4x its resolution using a multimodal model.
+ * @param base64Image The base64 data URL of the image to upscale.
+ * @returns A promise that resolves to the data URL of the upscaled image.
+ */
+export const upscaleImage = async (base64Image: string): Promise<string> => {
+    console.log('Upscaling image...');
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY! });
+
+    try {
+        const imagePart = fileToGenerativePart(base64Image);
+        const textPart = {
+            text: "Please upscale this image to 4x its original resolution. Focus on enhancing details and clarity without adding, removing, or changing any elements in the original image."
+        };
+
+        const response = await ai.models.generateContent({
+            model: 'gemini-2.5-flash-image-preview',
+            contents: { parts: [imagePart, textPart] }, // Corrected: must be an object for single-turn requests
+            config: {
+                responseModalities: [Modality.IMAGE, Modality.TEXT],
+            },
+        });
+        
+        const outputImagePart = response.candidates?.[0]?.content?.parts?.find(part => part.inlineData);
+
+        if (outputImagePart?.inlineData) {
+            const base64ImageBytes: string = outputImagePart.inlineData.data;
+            const mimeType = outputImagePart.inlineData.mimeType;
+            const imageUrl = `data:${mimeType};base64,${base64ImageBytes}`;
+            console.log('Image upscaled successfully.');
+            return imageUrl;
+        } else {
+            console.error('API response did not contain valid image data for upscale request.', response);
+            throw new Error('Upscaling failed: No image data received from API.');
+        }
+    } catch (error) {
+        console.error('Error calling Gemini API for upscaling:', error);
+        let errorMessage = 'An unknown error occurred during image upscaling.';
+         if (error instanceof Error) {
             errorMessage = error.message;
             const geminiError = error as any;
             if (geminiError.response?.promptFeedback?.blockReason) {
