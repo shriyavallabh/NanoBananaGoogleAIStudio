@@ -1,0 +1,6 @@
+{
+  "name": "Gemini Image Studio Pro",
+  "description": "A professional, single-page web application for AI image generation using the Gemini API. Features an asynchronous processing queue, character consistency, and flexible aspect ratio control.",
+  "requestFramePermissions": [],
+  "prompt": ""
+}
